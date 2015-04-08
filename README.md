@@ -26,7 +26,7 @@ bar
 Installation
 ------------
 
-For Ubuntu 12.04 or 14.04, download some release and put it into PATH. For others -- see "building from source" instructions.
+For Ubuntu 12.04, 14.04 and MacOS X download some release and put it into PATH. For others -- see "building from source" instructions.
 
 https://github.com/k-bx/par/releases
 

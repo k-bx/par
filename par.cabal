@@ -24,9 +24,11 @@ executable par
   build-depends:       base
                      , async
                      , enclosed-exceptions
+                     , interpolatedstring-perl6
                      , optparse-applicative
                      , process
                      , semigroups
+                     , stm
                      , slave-thread
                      , text
   hs-source-dirs:      src

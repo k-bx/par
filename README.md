@@ -7,7 +7,7 @@ by default exits with a failure status of a first failure it sees.
 Example usage:
 
 ```
-➜  ~  ~/workspace/par/dist/build/par/par "echo foo; sleep 1; echo foo; sleep 1; echo foo" "echo bar; sleep 1; echo bar; sleep 1; echo bar" && echo "success"
+➜  ~  par "echo foo; sleep 1; echo foo; sleep 1; echo foo" "echo bar; sleep 1; echo bar; sleep 1; echo bar" && echo "success"
 foo
 bar
 bar
@@ -15,7 +15,7 @@ foo
 bar
 foo
 success
-➜  ~  ~/workspace/par/dist/build/par/par "echo foo; sleep 1; foofoo" "echo bar; sleep 1; echo bar; sleep 1; echo bar" && echo "success"
+➜  ~  par "echo foo; sleep 1; foofoo" "echo bar; sleep 1; echo bar; sleep 1; echo bar" && echo "success"
 bar
 foo
 bar

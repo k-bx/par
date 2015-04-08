@@ -120,10 +120,10 @@ they also don't let you quote neither single-quote nor double-quote.
 
 Turns out good old ASCII-quotes are available as $'string' syntax! Example:
 
-> echo $'foo'
-foo
-> echo $'foo with "doublequotes and \'singletuoes\' inside"!'
-foo with "doublequotes and 'singletuoes' inside"!
+    > echo $'foo'
+    foo
+    > echo $'foo with "doublequotes and \'singletuoes\' inside"!'
+    foo with "doublequotes and 'singletuoes' inside"!
 
 You are a better person with this knowledge now. $'Enjoy!'
 |]

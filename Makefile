@@ -3,7 +3,7 @@ build:
 	cabal build
 	strip ./dist/build/par/par
 .PHONY: build
-transer:
+transfer:
 	curl --upload-file ./dist/build/par/par https://transfer.sh/par
 .PHONY: transfer
 install:

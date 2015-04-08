@@ -51,9 +51,8 @@ Example:
 
 ```
 cd /tmp
-wget https://github.com/k-bx/par/releases/download/1.0.0/par-ubuntu-12.04.tar.gz
-tar xvf ./par-ubuntu-12.04.tar.gz
-sudo mv ./par /usr/local/bin/
+wget https://github.com/k-bx/par/releases/download/1.0.1/par-ubuntu-12.04
+sudo mv ./par-ubuntu-12.04 /usr/local/bin/
 ```
 
 Building from source

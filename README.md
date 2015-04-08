@@ -23,6 +23,21 @@ bar
 bar
 ```
 
+`--help`:
+
+```
+➜  ~  par --help
+
+Run several commands in parallel
+
+Usage: par [--succeed] COMMANDS...
+  Run several commands in parallel
+
+Available options:
+  -h,--help                Show this help text
+  --succeed                Return 0 code no matter what
+```
+
 Installation
 ------------
 

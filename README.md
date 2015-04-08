@@ -62,10 +62,6 @@ Building from source
 2. run `make`. Produced executable will be inside `./dist/build/par/par`
 3. optionally, run `sudo make install` to copy into `/usr/local/bin/`
 
-Please note that `par` uses specific set of versions to build, setting
-them via cabal.config file. If you want to remove these constraints,
-just remove the file.
-
 Footnote on strings in bash/zsh
 -------------------------------
 

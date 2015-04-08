@@ -35,3 +35,7 @@ Building from source
 2. run `make`
 
 Executable will be inside `./dist/build/par/par`
+
+Please note that `par` uses specific set of versions to build, setting
+them via cabal.config file. If you want to remove these constraints,
+just remove the file.

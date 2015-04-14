@@ -3,8 +3,11 @@
 
 module Main where
 
+import           Control.Concurrent         (ThreadId)
 import           Control.Concurrent.Async
+import           Control.Concurrent.MVar
 import           Control.Concurrent.STM
+import           Control.Exception          (finally)
 import           Control.Exception.Enclosed (handleAny)
 import           Control.Monad              (MonadPlus (..), forever)
 import           Data.Foldable
@@ -36,27 +39,44 @@ main = execParser opts >>= work
              (fullDesc
               <> progDesc desc)
     desc = "Run several commands in parallel"
+
 work :: Options -> IO ()
 work opts = do
     outQ <- newTQueueIO
     errQ <- newTQueueIO
-    _ <- fork (runOutqueueFlusher outQ stdout)
-    _ <- fork (runOutqueueFlusher errQ stderr)
+    let numCmds = length (optCommands opts)
+    (_, w1) <- forkW (runOutqueueFlusher outQ stdout numCmds)
+    (_, w2) <- forkW (runOutqueueFlusher errQ stderr numCmds)
     results <- mapConcurrently (runSingle outQ errQ) (optCommands opts)
+    waitSignal w1 >> waitSignal w2
     if optSucceed opts
     then exitWith ExitSuccess
     else maybe (exitWith ExitSuccess)
                (exitWith . NL.head)
                (NL.nonEmpty (filter (/= ExitSuccess) results))
 
-runSingle :: TQueue String -> TQueue String -> String -> IO ExitCode
+newtype WaitSignal = WaitSignal (MVar Bool)
+
+waitSignal :: WaitSignal -> IO ()
+waitSignal (WaitSignal mv) = takeMVar mv >> return ()
+
+-- | Fork with a wait-signal ability
+forkW :: IO a -> IO (ThreadId, WaitSignal)
+forkW f = do
+    ws <- newEmptyMVar
+    tid <- fork (finally f (putMVar ws True))
+    return (tid, WaitSignal ws)
+
+runSingle :: TQueue (Maybe String) -> TQueue (Maybe String) -> String -> IO ExitCode
 runSingle outQ errQ cmdBig = do
     (_, Just hout, Just herr, ph) <-
         createProcess (shell cmd){ std_out = CreatePipe
                                  , std_err = CreatePipe }
-    _ <- fork (forwardHandler hout outQ (\s -> [cmdPrefix ++ s]))
-    _ <- fork (forwardHandler herr errQ (\s -> [cmdPrefix ++ s]))
-    waitForProcess ph
+    (_, w1) <- forkW (forwardHandler hout outQ (\s -> [cmdPrefix ++ s]))
+    (_, w2) <- forkW (forwardHandler herr errQ (\s -> [cmdPrefix ++ s]))
+    res <- waitForProcess ph
+    waitSignal w1 >> waitSignal w2
+    return res
   where
     -- TODO: rewrite via Parsec or regex-applicative
     (cmd, cmdPrefix) = if parprefix `L.isPrefixOf` cmdBig
@@ -66,11 +86,20 @@ runSingle outQ errQ cmdBig = do
     parprefix = "PARPREFIX="
 
 forwardHandler :: (MonadPlus mp, Foldable mp)
-               => Handle -> TQueue String -> (String -> mp String) -> IO ()
-forwardHandler from to f = handleAny (const (return ())) $ forever $ do
+               => Handle -> TQueue (Maybe String) -> (String -> mp String) -> IO ()
+forwardHandler from to f = fin $ hndl $ forever $ do
     l <- hGetLine from
-    mapM_ (\s -> atomically (writeTQueue to (s <> "\n"))) (f l)
+    mapM_ (\s -> atomically (writeTQueue to (Just (s <> "\n")))) (f l)
+  where
+    hndl = handleAny (const (return ()))
+    fin f' = finally f' (atomically (writeTQueue to Nothing))
 
-runOutqueueFlusher :: TQueue String -> Handle -> IO ()
-runOutqueueFlusher queue h = forever (atomically (readTQueue queue)
-                                      >>= hPutStr h)
+runOutqueueFlusher :: TQueue (Maybe String) -> Handle -> Int -> IO ()
+runOutqueueFlusher queue h numCmds = go numCmds
+  where
+    go 0 = return ()
+    go n = do
+      ml <- atomically (readTQueue queue)
+      case ml of
+        Nothing -> go (n-1)
+        Just l -> hPutStr h l >> go n

@@ -23,12 +23,14 @@ executable par
   -- other-extensions:    
   build-depends:       base
                      , async
+                     , bytestring
                      , enclosed-exceptions
                      , interpolatedstring-perl6
                      , optparse-applicative
                      , process
                      , semigroups
                      , stm
+                     , string-class
                      , slave-thread
                      , text
   hs-source-dirs:      src

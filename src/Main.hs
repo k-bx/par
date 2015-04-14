@@ -9,10 +9,13 @@ import           Control.Concurrent.MVar
 import           Control.Concurrent.STM
 import           Control.Exception          (finally)
 import           Control.Exception.Enclosed (handleAny)
-import           Control.Monad              (MonadPlus (..), forever)
+import           Control.Monad              (MonadPlus (..))
+import           Data.ByteString            (ByteString)
+import qualified Data.ByteString            as B
 import           Data.Foldable
 import qualified Data.List                  as L
 import qualified Data.List.NonEmpty         as NL
+import           Data.String.Class          (toStrictByteString)
 import           Options.Applicative
 import           Prelude                    hiding (mapM, mapM_)
 import           SlaveThread                (fork)
@@ -67,13 +70,13 @@ forkW f = do
     tid <- fork (finally f (putMVar ws True))
     return (tid, WaitSignal ws)
 
-runSingle :: TQueue (Maybe String) -> TQueue (Maybe String) -> String -> IO ExitCode
+runSingle :: TQueue (Maybe ByteString) -> TQueue (Maybe ByteString) -> String -> IO ExitCode
 runSingle outQ errQ cmdBig = do
     (_, Just hout, Just herr, ph) <-
         createProcess (shell cmd){ std_out = CreatePipe
                                  , std_err = CreatePipe }
-    (_, w1) <- forkW (forwardHandler hout outQ (\s -> [cmdPrefix ++ s]))
-    (_, w2) <- forkW (forwardHandler herr errQ (\s -> [cmdPrefix ++ s]))
+    (_, w1) <- forkW (forwardHandler hout outQ (\s -> [toBs cmdPrefix <> s]))
+    (_, w2) <- forkW (forwardHandler herr errQ (\s -> [toBs cmdPrefix <> s]))
     res <- waitForProcess ph
     waitSignal w1 >> waitSignal w2
     return res
@@ -84,17 +87,23 @@ runSingle outQ errQ cmdBig = do
                             in (rest, pref <> " ")
                        else (cmdBig, "")
     parprefix = "PARPREFIX="
+    toBs = toStrictByteString
 
 forwardHandler :: (MonadPlus mp, Foldable mp)
-               => Handle -> TQueue (Maybe String) -> (String -> mp String) -> IO ()
-forwardHandler from to f = fin $ hndl $ forever $ do
-    l <- hGetLine from
-    mapM_ (\s -> atomically (writeTQueue to (Just (s <> "\n")))) (f l)
+               => Handle -> TQueue (Maybe ByteString) -> (ByteString -> mp ByteString) -> IO ()
+forwardHandler from to f = fin (hndl go)
   where
+    go = do
+      eof <- hIsEOF from
+      if eof then return ()
+      else do
+        l <- B.hGetSome from (1024 * 1024)
+        mapM_ (\s -> atomically (writeTQueue to (Just s))) (f l)
+        go
     hndl = handleAny (const (return ()))
     fin f' = finally f' (atomically (writeTQueue to Nothing))
 
-runOutqueueFlusher :: TQueue (Maybe String) -> Handle -> Int -> IO ()
+runOutqueueFlusher :: TQueue (Maybe ByteString) -> Handle -> Int -> IO ()
 runOutqueueFlusher queue h numCmds = go numCmds
   where
     go 0 = return ()
@@ -102,4 +111,4 @@ runOutqueueFlusher queue h numCmds = go numCmds
       ml <- atomically (readTQueue queue)
       case ml of
         Nothing -> go (n-1)
-        Just l -> hPutStr h l >> go n
+        Just l -> B.hPut h l >> go n

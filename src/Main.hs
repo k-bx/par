@@ -45,8 +45,8 @@ main = execParser opts >>= work
 
 work :: Options -> IO ()
 work opts = do
-    outQ <- newTQueueIO
-    errQ <- newTQueueIO
+    outQ <- newTBQueueIO 1024
+    errQ <- newTBQueueIO 1024
     let numCmds = length (optCommands opts)
     (_, w1) <- forkW (runOutqueueFlusher outQ stdout numCmds)
     (_, w2) <- forkW (runOutqueueFlusher errQ stderr numCmds)
@@ -70,7 +70,7 @@ forkW f = do
     tid <- fork (finally f (putMVar ws True))
     return (tid, WaitSignal ws)
 
-runSingle :: TQueue (Maybe ByteString) -> TQueue (Maybe ByteString) -> String -> IO ExitCode
+runSingle :: TBQueue (Maybe ByteString) -> TBQueue (Maybe ByteString) -> String -> IO ExitCode
 runSingle outQ errQ cmdBig = do
     (_, Just hout, Just herr, ph) <-
         createProcess (shell cmd){ std_out = CreatePipe
@@ -90,7 +90,7 @@ runSingle outQ errQ cmdBig = do
     toBs = toStrictByteString
 
 forwardHandler :: (MonadPlus mp, Foldable mp)
-               => Handle -> TQueue (Maybe ByteString) -> (ByteString -> mp ByteString) -> IO ()
+               => Handle -> TBQueue (Maybe ByteString) -> (ByteString -> mp ByteString) -> IO ()
 forwardHandler from to f = fin (hndl go)
   where
     go = do
@@ -98,17 +98,17 @@ forwardHandler from to f = fin (hndl go)
       if eof then return ()
       else do
         l <- B.hGetSome from (1024 * 1024)
-        mapM_ (\s -> atomically (writeTQueue to (Just s))) (f l)
+        mapM_ (\s -> atomically (writeTBQueue to (Just s))) (f l)
         go
     hndl = handleAny (const (return ()))
-    fin f' = finally f' (atomically (writeTQueue to Nothing))
+    fin f' = finally f' (atomically (writeTBQueue to Nothing))
 
-runOutqueueFlusher :: TQueue (Maybe ByteString) -> Handle -> Int -> IO ()
+runOutqueueFlusher :: TBQueue (Maybe ByteString) -> Handle -> Int -> IO ()
 runOutqueueFlusher queue h numCmds = go numCmds
   where
     go 0 = return ()
     go n = do
-      ml <- atomically (readTQueue queue)
+      ml <- atomically (readTBQueue queue)
       case ml of
         Nothing -> go (n-1)
         Just l -> B.hPut h l >> go n

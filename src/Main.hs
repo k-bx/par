@@ -24,16 +24,12 @@ import           System.IO
 import           System.Process
 
 data Options = Options
-    { optSucceed  :: Bool
-    , optCommands :: [String] }
+    { optCommands :: [String] }
     deriving (Eq, Show)
 
 parser :: Parser Options
 parser = Options
-  <$> flag False True
-      ( long "succeed"
-     <> help "Return 0 code no matter what" )
-  <*> some (argument str (metavar "COMMANDS..."))
+  <$> some (argument str (metavar "COMMANDS..."))
 
 main :: IO ()
 main = execParser opts >>= work
@@ -52,11 +48,9 @@ work opts = do
     (_, w2) <- forkW (runOutqueueFlusher errQ stderr numCmds)
     results <- mapConcurrently (runSingle outQ errQ) (optCommands opts)
     waitSignal w1 >> waitSignal w2
-    if optSucceed opts
-    then exitWith ExitSuccess
-    else maybe (exitWith ExitSuccess)
-               (exitWith . NL.head)
-               (NL.nonEmpty (filter (/= ExitSuccess) results))
+    maybe (exitWith ExitSuccess)
+          (exitWith . NL.head)
+          (NL.nonEmpty (filter (/= ExitSuccess) results))
 
 newtype WaitSignal = WaitSignal (MVar Bool)
 

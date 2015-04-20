@@ -28,6 +28,7 @@ executable par
                      , interpolatedstring-perl6
                      , optparse-applicative
                      , process
+                     , safe
                      , semigroups
                      , stm
                      , string-class

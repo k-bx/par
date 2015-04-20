@@ -1,5 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE QuasiQuotes         #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Main where
 
@@ -9,15 +10,16 @@ import           Control.Concurrent.MVar
 import           Control.Concurrent.STM
 import           Control.Exception          (finally)
 import           Control.Exception.Enclosed (handleAny)
-import           Control.Monad              (MonadPlus (..))
 import           Data.ByteString            (ByteString)
 import qualified Data.ByteString            as B
+import qualified Data.ByteString.Char8      as BSC8
 import           Data.Foldable
 import qualified Data.List                  as L
 import qualified Data.List.NonEmpty         as NL
 import           Data.String.Class          (toStrictByteString)
 import           Options.Applicative
 import           Prelude                    hiding (mapM, mapM_)
+import           Safe
 import           SlaveThread                (fork)
 import           System.Exit
 import           System.IO
@@ -69,8 +71,8 @@ runSingle outQ errQ cmdBig = do
     (_, Just hout, Just herr, ph) <-
         createProcess (shell cmd){ std_out = CreatePipe
                                  , std_err = CreatePipe }
-    (_, w1) <- forkW (forwardHandler hout outQ (\s -> [toBs cmdPrefix <> s]))
-    (_, w2) <- forkW (forwardHandler herr errQ (\s -> [toBs cmdPrefix <> s]))
+    (_, w1) <- forkW (forwardHandler hout outQ prefixer)
+    (_, w2) <- forkW (forwardHandler herr errQ prefixer)
     res <- waitForProcess ph
     waitSignal w1 >> waitSignal w2
     return res
@@ -82,18 +84,28 @@ runSingle outQ errQ cmdBig = do
                        else (cmdBig, "")
     parprefix = "PARPREFIX="
     toBs = toStrictByteString
+    prefixer chunk isNewline = if isNewline
+                               then [toBs cmdPrefix <> chunk]
+                               else [chunk]
 
-forwardHandler :: (MonadPlus mp, Foldable mp)
-               => Handle -> TBQueue (Maybe ByteString) -> (ByteString -> mp ByteString) -> IO ()
-forwardHandler from to f = fin (hndl go)
+forwardHandler :: Handle
+               -> TBQueue (Maybe ByteString)
+               -> (ByteString -> Bool -> [ByteString])
+               -> IO ()
+forwardHandler from to f = fin (hndl (go True))
   where
-    go = do
+    go endedNewline = do
       eof <- hIsEOF from
       if eof then return ()
       else do
-        l <- B.hGetSome from (1024 * 1024)
-        mapM_ (\s -> atomically (writeTBQueue to (Just s))) (f l)
-        go
+        chunk <- B.hGetSome from (1024 * 1024)
+        let ls = BSC8.split '\n' chunk
+        let fl = f (headDef "" ls) endedNewline
+            rest = msum (map (\l -> f l True) (tailDef [] ls))
+            lastEmpty = last ls == ""
+            rest' = if lastEmpty then init rest else rest
+        mapM_ (\l -> atomically (writeTBQueue to (Just (l <> "\n")))) (fl <> rest')
+        go lastEmpty
     hndl = handleAny (const (return ()))
     fin f' = finally f' (atomically (writeTBQueue to Nothing))
 

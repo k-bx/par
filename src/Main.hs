@@ -96,8 +96,7 @@ forwardHandler from to f = fin (hndl (go True))
       eof <- hIsEOF from
       if eof then return ()
       else do
-        -- chunk <- B.hGetSome from (1024 * 1024)
-        chunk <- B.hGetSome from 10
+        chunk <- B.hGetSome from (1024 * 1024)
         let ls = BSC8.split '\n' chunk
         case ls of
           [] -> go addFirstPrefix

@@ -12,14 +12,11 @@ import           Control.Exception          (finally)
 import           Control.Exception.Enclosed (handleAny)
 import           Data.ByteString            (ByteString)
 import qualified Data.ByteString            as B
-import qualified Data.ByteString.Char8      as BSC8
-import           Data.Foldable
 import qualified Data.List                  as L
 import qualified Data.List.NonEmpty         as NL
 import           Data.String.Class          (toStrictByteString)
 import           Options.Applicative
 import           Prelude                    hiding (mapM, mapM_)
-import           Safe
 import           SlaveThread                (fork)
 import           System.Exit
 import           System.IO
@@ -49,10 +46,14 @@ work opts = do
     (_, w1) <- forkW (runOutqueueFlusher outQ stdout numCmds)
     (_, w2) <- forkW (runOutqueueFlusher errQ stderr numCmds)
     results <- mapConcurrently (runSingle outQ errQ) (optCommands opts)
+    let cmdAndRes = zip (optCommands opts) results
     waitSignal w1 >> waitSignal w2
     maybe (exitWith ExitSuccess)
-          (exitWith . NL.head)
-          (NL.nonEmpty (filter (/= ExitSuccess) results))
+          (\rs -> do
+             let (c, r) = NL.head rs
+             hPutStrLn stderr ("Failed command:\n" <> c)
+             exitWith r)
+          (NL.nonEmpty (filter ((/= ExitSuccess) . snd) cmdAndRes))
 
 newtype WaitSignal = WaitSignal (MVar Bool)
 

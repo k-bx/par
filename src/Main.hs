@@ -90,25 +90,15 @@ forwardHandler :: Handle
                -> TBQueue (Maybe ByteString)
                -> (ByteString -> [ByteString])
                -> IO ()
-forwardHandler from to f = fin (hndl (go True))
+forwardHandler from to f = fin (hndl go)
   where
-    go addFirstPrefix = do
+    go = do
       eof <- hIsEOF from
       if eof then return ()
       else do
-        chunk <- B.hGetSome from (1024 * 1024)
-        let ls = BSC8.split '\n' chunk
-        case ls of
-          [] -> go addFirstPrefix
-          (fl:ll) -> do
-            let firstTransformed = if addFirstPrefix then B.concat (f fl) else fl
-                                   <> if null ll then "" else "\n"
-                lastNewline = BSC8.last chunk == '\n'
-                -- ll' = if lastNewline then init ll else ll
-                rest = BSC8.intercalate "\n" (map (BSC8.intercalate "\n" . f) ll)
-                rest' = if lastNewline then rest <> "\n" else rest
-            mapM_ (atomically . writeTBQueue to . Just) [firstTransformed, rest']
-            go lastNewline
+        line <- B.hGetLine from
+        atomically (writeTBQueue to (Just (B.concat (map (<> "\n") (f line)))))
+        go
     hndl = handleAny (const (return ()))
     fin f' = finally f' (atomically (writeTBQueue to Nothing))
 

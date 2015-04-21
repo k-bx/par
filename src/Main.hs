@@ -105,8 +105,8 @@ forwardHandler from to f = fin (hndl (go True))
             let firstTransformed = if addFirstPrefix then B.concat (f fl) else fl
                                    <> if null ll then "" else "\n"
                 lastNewline = BSC8.last chunk == '\n'
-                ll' = if lastNewline then init ll else ll
-                rest = BSC8.intercalate "\n" (map (BSC8.intercalate "\n" . f) ll')
+                -- ll' = if lastNewline then init ll else ll
+                rest = BSC8.intercalate "\n" (map (BSC8.intercalate "\n" . f) ll)
                 rest' = if lastNewline then rest <> "\n" else rest
             mapM_ (atomically . writeTBQueue to . Just) [firstTransformed, rest']
             go lastNewline

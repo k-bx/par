@@ -100,12 +100,14 @@ forwardHandler from to f = fin (hndl (go True))
       else do
         chunk <- B.hGetSome from (1024 * 1024)
         let ls = BSC8.split '\n' chunk
-        let fl = f (headDef "" ls) endedNewline
-            rest = msum (map (\l -> f l True) (tailDef [] ls))
-            lastEmpty = last ls == ""
-            rest' = if lastEmpty then init rest else rest
-        mapM_ (\l -> atomically (writeTBQueue to (Just (l <> "\n")))) (fl <> rest')
-        go lastEmpty
+        case ls of
+          [] -> go False
+          (fl:ll) -> do
+            let lastEmpty = BSC8.last chunk == '\n'
+                rest = msum (map (\l -> f l True) ll) :: [ByteString]
+                prefixedChunks = map (<> "\n") (f fl endedNewline) <> [fold (L.intersperse "\n" rest)]
+            mapM_ (\l -> atomically (writeTBQueue to (Just l))) prefixedChunks
+            go lastEmpty
     hndl = handleAny (const (return ()))
     fin f' = finally f' (atomically (writeTBQueue to Nothing))
 

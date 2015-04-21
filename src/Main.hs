@@ -84,30 +84,32 @@ runSingle outQ errQ cmdBig = do
                        else (cmdBig, "")
     parprefix = "PARPREFIX="
     toBs = toStrictByteString
-    prefixer chunk isNewline = if isNewline
-                               then [toBs cmdPrefix <> chunk]
-                               else [chunk]
+    prefixer chunk = [toBs cmdPrefix <> chunk]
 
 forwardHandler :: Handle
                -> TBQueue (Maybe ByteString)
-               -> (ByteString -> Bool -> [ByteString])
+               -> (ByteString -> [ByteString])
                -> IO ()
 forwardHandler from to f = fin (hndl (go True))
   where
-    go endedNewline = do
+    go addFirstPrefix = do
       eof <- hIsEOF from
       if eof then return ()
       else do
-        chunk <- B.hGetSome from (1024 * 1024)
+        -- chunk <- B.hGetSome from (1024 * 1024)
+        chunk <- B.hGetSome from 10
         let ls = BSC8.split '\n' chunk
         case ls of
-          [] -> go False
+          [] -> go addFirstPrefix
           (fl:ll) -> do
-            let lastEmpty = BSC8.last chunk == '\n'
-                rest = msum (map (\l -> f l True) ll) :: [ByteString]
-                prefixedChunks = map (<> "\n") (f fl endedNewline) <> [fold (L.intersperse "\n" rest)]
-            mapM_ (\l -> atomically (writeTBQueue to (Just l))) prefixedChunks
-            go lastEmpty
+            let firstTransformed = if addFirstPrefix then B.concat (f fl) else fl
+                                   <> if null ll then "" else "\n"
+                lastNewline = BSC8.last chunk == '\n'
+                ll' = if lastNewline then init ll else ll
+                rest = BSC8.intercalate "\n" (map (BSC8.intercalate "\n" . f) ll')
+                rest' = if lastNewline then rest <> "\n" else rest
+            mapM_ (atomically . writeTBQueue to . Just) [firstTransformed, rest']
+            go lastNewline
     hndl = handleAny (const (return ()))
     fin f' = finally f' (atomically (writeTBQueue to Nothing))
 

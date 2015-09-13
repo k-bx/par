@@ -1,6 +1,4 @@
 flags: {}
 packages:
 - '.'
-extra-deps:
-- string-class-0.1.6.4
-resolver: lts-2.16
+resolver: lts-3.4

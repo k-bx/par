@@ -27,9 +27,9 @@ Basic usage example
 Adding prefix to output
 -----------------------
 
-    > par "PARPREFIX=[fooechoer] echo foo" "echo bar"
+    > par "PARPREFIX=[fooechoer] echo foo" "PARPREFIX=[bar] echo bar"
     [fooechoer] foo
-    bar
+    [bar] bar
 
 Force success exit-code
 -----------------------
@@ -58,9 +58,8 @@ sudo mv ./par-ubuntu-12.04 /usr/local/bin/
 Building from source
 --------------------
 
-1. [Install Haskell's GHC compiler](http://www.stackage.org/install)
-2. run `make`. Produced executable will be inside `./dist/build/par/par`
-3. optionally, run `sudo make install` to copy into `/usr/local/bin/`
+1. Install [haskell stack tool](https://github.com/commercialhaskell/stack)
+2. Run `stack install`. It'll build and install tool into `~/.local/bin/par`
 
 Footnote on strings in bash/zsh
 -------------------------------

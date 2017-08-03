@@ -25,11 +25,8 @@ executable par
                      , async
                      , bytestring
                      , enclosed-exceptions
-                     , interpolatedstring-perl6
                      , optparse-applicative
                      , process
-                     , safe
-                     , semigroups
                      , stm
                      , string-class
                      , slave-thread

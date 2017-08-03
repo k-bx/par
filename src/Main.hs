@@ -21,7 +21,7 @@ import Data.Semigroup
 import Data.String.Class (toStrictByteString)
 import Options.Applicative
 import Prelude hiding (mapM, mapM_)
-import SlaveThread (fork)
+import SlaveThread (fork, forkFinally)
 import System.Exit
 import System.IO
 import System.Process
@@ -97,7 +97,7 @@ waitSignal (WaitSignal mv) = takeMVar mv >> return ()
 forkW :: IO a -> IO (ThreadId, WaitSignal)
 forkW f = do
   ws <- newEmptyMVar
-  tid <- fork (finally f (putMVar ws True))
+  tid <- forkFinally (putMVar ws True) f
   return (tid, WaitSignal ws)
 
 runSingle ::

@@ -17,7 +17,7 @@ import Data.Foldable
 import qualified Data.List as L
 import qualified Data.List.NonEmpty as NL
 import Data.Maybe
-import Data.Semigroup
+import Data.Semigroup ((<>))
 import Data.String.Class (toStrictByteString)
 import Options.Applicative
 import Prelude hiding (mapM, mapM_)
@@ -28,6 +28,7 @@ import System.Process
 
 data Options = Options
   { optMasterProcess :: Maybe Int
+  , optVerbose :: Bool
   , optCommands :: [String]
   } deriving (Eq, Show)
 
@@ -39,7 +40,15 @@ parser =
   (fmap (fmap read) . optional . strOption $
    long "master-process" <> metavar "MASTER_PROCESS" <>
    help
-     "Master process index, starting from 0. Indicates command, which lifetime and exit-code only matter") <*>
+     "Master process index, starting from 0. Indicates command, which lifetime and exit-code only matter")
+  <*>
+  option auto
+  ( long "verbose"
+    <> help "Print debug output"
+    <> showDefault
+    <> value False
+    <> metavar "BOOL" )
+  <*>
   some (argument str (metavar "COMMANDS..."))
 
 main :: IO ()
@@ -50,6 +59,7 @@ main = execParser opts >>= work
 
 work :: Options -> IO ()
 work opts = do
+  let debug msg = when (optVerbose opts) $ putStrLn msg
   outQ <- newTBQueueIO 1024
   errQ <- newTBQueueIO 1024
   let numCmds = length (optCommands opts)
@@ -57,7 +67,7 @@ work opts = do
     Nothing -> do
       (_, w1) <- forkW (runOutqueueFlusher outQ stdout numCmds)
       (_, w2) <- forkW (runOutqueueFlusher errQ stderr numCmds)
-      results <- mapConcurrently (runSingle outQ errQ) (optCommands opts)
+      results <- mapConcurrently (runSingle debug outQ errQ) (optCommands opts)
       let cmdAndRes = zip (optCommands opts) results
       waitSignal w1 >> waitSignal w2
       maybe
@@ -74,11 +84,13 @@ work opts = do
       _ <- fork (runOutqueueFlusher errQ stderr numCmds)
       let (xs, (m:ys)) = splitAt masterProcNum (optCommands opts)
           (master, rest) = (m, xs ++ ys)
-      mapM_ (fork . runSingle outQ errQ) rest
+      mapM_ (fork . runSingle debug outQ errQ) rest
       (_, w1) <- forkW (forwardWaiting outQMain outQ)
       (_, w2) <- forkW (forwardWaiting errQMain errQ)
-      status <- runSingle outQMain errQMain master
+      status <- runSingle debug outQMain errQMain master
+      debug $ "Master process " <> show m <> " exited with status " <> show status
       waitSignal w1 >> waitSignal w2
+      debug $ "Pipes drained, exiting"
       exitWith status
   where
     forwardWaiting from to = go
@@ -101,11 +113,13 @@ forkW f = do
   return (tid, WaitSignal ws)
 
 runSingle ::
-     TBQueue (Maybe ByteString)
+     (String -> IO ())
+  -> TBQueue (Maybe ByteString)
   -> TBQueue (Maybe ByteString)
   -> String
   -> IO ExitCode
-runSingle outQ errQ cmdBig = do
+runSingle debug outQ errQ cmdBig = do
+  debug $ "Starting process " <> show cmd <> ", output prefix " <> show cmdPrefix 
   (_, Just hout, Just herr, ph) <-
     createProcess (shell cmd) {std_out = CreatePipe, std_err = CreatePipe}
   (_, w1) <- forkW (forwardHandler hout outQ prefixer)

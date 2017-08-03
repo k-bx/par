@@ -1,5 +1,4 @@
-Run several commands in parallel
-================================
+# [![Build Status](https://travis-ci.org/k-bx/par.svg?branch=master)](https://travis-ci.org/k-bx/par) Run several commands in parallel
 
 `par` is a small utility that runs multiple commands in parallel and
 by default exits with a failure status of a first failure it sees.

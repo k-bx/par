@@ -37,15 +37,11 @@ parser =
   (fmap (fmap read) . optional . strOption $
    long "master-process" <> metavar "MASTER_PROCESS" <>
    help
-     "Master process index, starting from 0. Indicates command, which lifetime and exit-code only matter")
-  <*>
-  option auto
-  ( long "verbose"
-    <> help "Print debug output"
-    <> showDefault
-    <> value False
-    <> metavar "BOOL" )
-  <*>
+     "Master process index, starting from 0. Indicates command, which lifetime and exit-code only matter") <*>
+  option
+    auto
+    (long "verbose" <> help "Print debug output" <> showDefault <> value False <>
+     metavar "BOOL") <*>
   some (argument str (metavar "COMMANDS..."))
 
 main :: IO ()
@@ -70,7 +66,7 @@ work opts = do
       let cmdAndRes = zip (optCommands opts) results
       case filter ((/= ExitSuccess) . snd) cmdAndRes of
         [] -> exitSuccess
-        (c,r):_ -> do
+        (c, r):_ -> do
           hPutStrLn stderr $ "Failed command:\n" <> c
           exitWith r
     Just masterProcNum -> do
@@ -81,8 +77,10 @@ work opts = do
           let (xs, m:ys) = splitAt masterProcNum (optCommands opts)
               (master, rest) = (m, xs ++ ys)
           mapM_ (async . runSingle debug outQ errQ) rest
-          status <- waitingPipeHandlers (forwardWaiting outQMain outQ)
-            (forwardWaiting errQMain errQ) $
+          status <-
+            waitingPipeHandlers
+              (forwardWaiting outQMain outQ)
+              (forwardWaiting errQMain errQ) $
             runSingle debug outQMain errQMain master
           exitWith status
   where
@@ -99,17 +97,19 @@ runSingle ::
   -> String
   -> IO ExitCode
 runSingle debug outQ errQ cmdBig = do
-  debug $ "Starting process " <> show cmd <> ", output prefix " <> show cmdPrefix 
+  debug $
+    "Starting process " <> show cmd <> ", output prefix " <> show cmdPrefix
   (_, Just hout, Just herr, ph) <-
     createProcess (shell cmd) {std_out = CreatePipe, std_err = CreatePipe}
-  s <- waitingPipeHandlers
-    (forwardPrefixing hout outQ)
-    (forwardPrefixing herr errQ)
-    (waitForProcess ph)
+  s <-
+    waitingPipeHandlers
+      (forwardPrefixing hout outQ)
+      (forwardPrefixing herr errQ)
+      (waitForProcess ph)
   debug $ "Process " <> show cmdBig <> " exited with status " <> show s
   return s
-  where
     -- TODO: rewrite via Parsec or regex-applicative
+  where
     (cmd, cmdPrefix) =
       if parprefix `L.isPrefixOf` cmdBig
         then let (pref, rest) = break (== ' ') (drop (length parprefix) cmdBig)
@@ -139,8 +139,7 @@ forwardHandler from to f = fin (hndl go)
       eof <- hIsEOF from
       unless eof $ do
         line <- B.hGetLine from
-        atomically
-          (writeTBQueue to (Just (B.concat (map (<> "\n") (f line)))))
+        atomically (writeTBQueue to (Just (B.concat (map (<> "\n") (f line)))))
         go
     hndl = handleAny (const (return ()))
     fin f' = finally f' (atomically (writeTBQueue to Nothing))

@@ -113,7 +113,7 @@ runSingle debug outQ errQ cmdBig = do
     (cmd, cmdPrefix) =
       if parprefix `L.isPrefixOf` cmdBig
         then let (pref, rest) = break (== ' ') (drop (length parprefix) cmdBig)
-             in (rest, pref <> " ")
+              in (rest, pref <> " ")
         else (cmdBig, "")
     parprefix = "PARPREFIX="
     toBs = toStrictByteString

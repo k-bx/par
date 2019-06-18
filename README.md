@@ -38,6 +38,15 @@ Force success exit-code
     /bin/sh: bar: command not found
     wow
 
+Forcing processes to not buffer their output
+--------------------------------------------
+
+Prefix your subprocesses with this command:
+
+```
+stdbuf -o 0
+```
+
 Installation
 ------------
 
@@ -80,3 +89,25 @@ Turns out good old ASCII-quotes are available as $'string' syntax! Example:
     foo with "doublequotes and 'singletuoes' inside"!
 
 You are a better person with this knowledge now. $'Enjoy!'
+
+Par-like thing in pure Bash
+---------------------------
+
+```
+prefixwith() {
+    local prefix="$1"
+    shift
+    stdbuf -o 0 "$@" 1> >(sed "s/^/$prefix: /") 2> >(sed "s/^/$prefix (err): /" >&2)
+}
+listenqueue() {
+    local queue="$1"
+    prefixwith "[$queue]" kafkacat -b localhost -t $queue -o end &
+}
+listenqueue diarizer-input
+P01=$!
+listenqueue diarizer-output
+P02=$!
+wait $P01 $P02
+```
+
+But this has problems with stopping (need to re-create TTY).

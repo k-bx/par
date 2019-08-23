@@ -39,16 +39,20 @@ parser =
     auto
     (long "verbose" <> help "Print debug output" <> showDefault <> value False <>
      metavar "BOOL") <*>
-  some (argument str (metavar "COMMANDS..."))
+  many (argument str (metavar "COMMANDS..."))
 
 main :: IO ()
 main = do
   hSetBuffering stderr LineBuffering
   hSetBuffering stdout NoBuffering
-  execParser opts >>= work
+  execParser opts >>= tryStdin >>= work
   where
     opts = info (helper <*> parser) (fullDesc <> progDesc desc)
     desc = "Run several commands in parallel"
+
+tryStdin :: Options -> IO Options
+tryStdin o@Options{optCommands=_:_} = pure o
+tryStdin o@Options{optCommands=[]}  = (\xs -> o{optCommands=xs}) . lines <$> getContents
 
 work :: Options -> IO ()
 work opts = do

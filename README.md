@@ -8,35 +8,50 @@ Use `--help` for command-line help.
 Basic usage example
 -------------------
 
-    > par "echo foo; sleep 1; echo foo; sleep 1; echo foo" "echo bar; sleep 1; echo bar; sleep 1; echo bar" && echo "success"
-    foo
-    bar
-    bar
-    foo
-    bar
-    foo
-    success
-    > par "echo foo; sleep 1; foofoo" "echo bar; sleep 1; echo bar; sleep 1; echo bar" && echo "success"
-    bar
-    foo
-    bar
-    /bin/sh: foofoo: command not found
-    bar
+```
+> par "echo foo; sleep 1; echo foo; sleep 1; echo foo" "echo bar; sleep 1; echo bar; sleep 1; echo bar" && echo "success"
+foo
+bar
+bar
+foo
+bar
+foo
+success
+> par "echo foo; sleep 1; foofoo" "echo bar; sleep 1; echo bar; sleep 1; echo bar" && echo "success"
+bar
+foo
+bar
+/bin/sh: foofoo: command not found
+bar
+```
+
+Passing commands over stdin
+---------------------------
+
+Plot 6 streams of data in real time with [feedgnuplot](https://github.com/dkogan/feedgnuplot):
+
+```
+for n in a b c d e f; do echo PARPREFIX=$n' (while true; do echo $RANDOM; sleep 0.2; done)'; done | par | feedgnuplot --dataid --stream 0.2 --xlen 1000 --lines --points --terminal qt --exit --autolegend
+```
 
 Adding prefix to output
 -----------------------
 
-    > par "PARPREFIX=[fooechoer] echo foo" "PARPREFIX=[bar] echo bar"
-    [fooechoer] foo
-    [bar] bar
+```
+> par "PARPREFIX=[fooechoer] echo foo" "PARPREFIX=[bar] echo bar"
+[fooechoer] foo
+[bar] bar
+```
 
 Force success exit-code
 -----------------------
 
-    > par --succeed "foo" "bar" && echo 'wow'
-    /bin/sh: foo: command not found
-    /bin/sh: bar: command not found
-    wow
+```
+> par --succeed "foo" "bar" && echo 'wow'
+/bin/sh: foo: command not found
+/bin/sh: bar: command not found
+wow
+```
 
 Forcing processes to not buffer their output
 --------------------------------------------

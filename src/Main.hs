@@ -42,7 +42,10 @@ parser =
   some (argument str (metavar "COMMANDS..."))
 
 main :: IO ()
-main = execParser opts >>= work
+main = do
+  hSetBuffering stderr LineBuffering
+  hSetBuffering stdout NoBuffering
+  execParser opts >>= work
   where
     opts = info (helper <*> parser) (fullDesc <> progDesc desc)
     desc = "Run several commands in parallel"

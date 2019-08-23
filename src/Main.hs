@@ -52,7 +52,7 @@ main = do
 
 work :: Options -> IO ()
 work opts = do
-  let debug msg = when (optVerbose opts) $ putStrLn msg
+  let debug msg = when (optVerbose opts) $ hPutStrLn stderr msg
   outQ <- newTBQueueIO 1024
   errQ <- newTBQueueIO 1024
   let numCmds = length (optCommands opts)

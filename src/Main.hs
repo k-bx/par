@@ -1,6 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Main
   ( main
   ) where
@@ -42,17 +39,24 @@ parser =
     auto
     (long "verbose" <> help "Print debug output" <> showDefault <> value False <>
      metavar "BOOL") <*>
-  some (argument str (metavar "COMMANDS..."))
+  many (argument str (metavar "COMMANDS..."))
 
 main :: IO ()
-main = execParser opts >>= work
+main = do
+  hSetBuffering stderr LineBuffering
+  hSetBuffering stdout NoBuffering
+  execParser opts >>= tryStdin >>= work
   where
     opts = info (helper <*> parser) (fullDesc <> progDesc desc)
     desc = "Run several commands in parallel"
 
+tryStdin :: Options -> IO Options
+tryStdin o@Options{optCommands=_:_} = pure o
+tryStdin o@Options{optCommands=[]}  = (\xs -> o{optCommands=xs}) . lines <$> getContents
+
 work :: Options -> IO ()
 work opts = do
-  let debug msg = when (optVerbose opts) $ putStrLn msg
+  let debug msg = when (optVerbose opts) $ hPutStrLn stderr msg
   outQ <- newTBQueueIO 1024
   errQ <- newTBQueueIO 1024
   let numCmds = length (optCommands opts)
